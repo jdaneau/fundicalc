@@ -172,7 +172,7 @@ taxa <- scan(splitfile,what=integer(),quiet=TRUE)
 # get the initial optimization for t from IQTREE output
 make.utree("tmp.AB.treefile",seqfile,"tmp.AB.utreec","tmp.AB.utreec.names")
 uAB <- root_tree("tmp.AB.utreec",taxa); write.table(uAB, file="tmp.AB.utreec", row.names=FALSE, col.names=FALSE)
-tmax <- sum(uAB[nrow(uAB),3:4]) # take the last row from the utreec matrix (split root)
+tmax <- best.t <- sum(uAB[nrow(uAB),3:4]) # take the last row from the utreec matrix (split root)
 cat(paste("IQ-TREE optimized edge length t:",tmax,"\n"))
 rem_iqtree("AB") 
 
@@ -200,6 +200,7 @@ for(t in grid){
   new.rho <- optim_rho(lAB,lA,lB)
   cat(paste("t =",t,paste0("(",i,"/",grid.size,")"),": rho =",new.rho[1],", lf =",new.rho[2],"\n"))
   if(new.rho[2] > rho[2]) {
+    best.t <- t
     rho[1] <- new.rho[1]; rho[2] <- new.rho[2]
     cat(paste("New best found; rho updated to",rho[1],"\n"))
   }
@@ -208,7 +209,7 @@ for(t in grid){
   i <- i+1
 }
 
-cat(paste("FINISHED: best rho =",rho[1],", lf =",rho[2],"\n"))
+cat(paste("FINISHED: best rho =",rho[1],", lf =",rho[2],", t =",best.t,"\n"))
 
 # remove the rest of the generated files
 to.remove <- c("tmp.AB.utreec","tmp.AB.utreec.names","tmp.AB.treefile",
