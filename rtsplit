@@ -1,0 +1,90 @@
+#!/usr/bin/env Rscript
+bindir <- ""
+source("convert_tree.R")
+source("root_tree.R")
+##------------------------------------------------------------------------------
+
+# RTsplit (Tree Splitter in R)
+# Takes a labeled Newick tree file and creates 3 sets of 3 files for trees AB, A and B based on a given root and split point
+# To be used as input in fundicalc
+
+# Dependencies: convert_tree.R, root_tree.R
+
+##------------------------------------------------------------------------------
+
+## Process Command Line
+args <- commandArgs()
+iarg <- length(args)
+
+FnameE <- function(fname){
+  if(!file.exists(fname)) stop(paste(fname,"does not exist"))
+  return(fname)
+}
+
+seqfile <- treefile <- rootfile <- splitfile <- NULL
+while(iarg>=6){
+  if(substring(args[iarg],1,1)=='-'){
+    opt <- args[iarg]
+    is.opt <- TRUE
+  }else{
+    val <- args[iarg];
+    is.opt <- FALSE
+  }
+  if(is.opt){
+    not.an.option <- TRUE
+    if(opt=="-s"){
+      seqfile <- FnameE(val); not.an.option <- FALSE
+    }
+    if(opt=="-t"){
+      treefile <- FnameE(val); not.an.option <- FALSE
+    }
+    if(opt=="-r"){
+      taxafile <- FnameE(val); not.an.option <- FALSE
+    }
+    if(opt=="-l"){
+      splitfile <- FnameE(val); not.an.option <- FALSE
+    }
+    if(not.an.option) stop(paste(opt,"is not an option\n"))
+  }
+  iarg <- iarg-1
+}
+if(is.null(seqfile)) stop("Need sequence file: -s seqfile")
+if(is.null(treefile)) stop("Need tree file: -t treefile")
+if(is.null(taxafile)) stop("Need file with integer labels of taxa on one side of root: -r rootfile")
+if(is.null(splitfile)) stop("Need file with integer labels of taxa on one side of split: -l splitfile")
+
+# Get number of taxa from first line of sequence file
+f <- file(seqfile,"r")
+ntaxa <- as.numeric(unlist(strsplit(readLines(f,1)," "))[1])
+close(f)
+
+# Filenames
+A <- paste0("A.",treefile); A.names <- paste0("A.",treefile,".names")
+B <- paste0("B.",treefile); B.names <- paste0("B.",treefile,".names")
+AB <- paste0("AB.",treefile); AB.names <- paste0("AB.",treefile,".names")
+
+# Initialize and root the utree, then write to file
+utreec <- make.utree(treefile,seqfile,"tmp.utreec",AB.names)
+taxa <- scan(taxafile, what=integer())
+root_utreec <- root_tree("tmp.utreec",taxa)
+write.table(root_utreec, file="tmp.utreec", row.names=FALSE, col.names=FALSE)
+
+# Split trees into tree A and tree B using a version of AB rooted at the split point
+A.split <- scan(splitfile, what=integer())
+B.split <- setdiff(0:(ntaxa-1), A.split)
+split_utreec <- root_tree("tmp.utreec",A.split)
+write.table(split_utreec, file=AB, row.names=FALSE, col.names=FALSE)
+split_tree(AB, AB.names, A, A.split)
+split_tree(AB, AB.names, B, B.split)
+
+# Check A and B for faulty roots and fix them if needed
+check_root <- function(ut_f){
+  t <- scan(ut_f,what=numeric())
+  if(t[length(t)] == 0 | t[length(t)-1] == 0) {
+    force_root(ut_f)
+  }
+}
+check_root(A); check_root(B)
+
+# Remove temp file
+did.remove <- file.remove("tmp.utreec")
