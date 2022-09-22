@@ -29,11 +29,9 @@ tree_seq <- function(seqfile,names,pref) {
   write.phyDat(write.data, paste0(pref,".",seqfile),format = "sequential")
 }
 
-# flush out all iqtree output that was generated with a given set of prefixes
-rem_iqtree <- function(...) {
-  for(pref in list(...)){
-    did.remove <- file.remove(list.files(path=getwd(), pattern=paste0("^tmp\\.",pref,"\\.(log|ckp.gz|iqtree|sitelh|siteprob)$")))
-  }
+# flush out all iqtree output that was generated
+rem_iqtree <- function() {
+  did.remove <- file.remove(list.files(path=getwd(), pattern=paste0("^.*tmp\\.(log|ckp\\.gz|iqtree|sitelh|siteprob)$")))
 }
 
 # optim_rho is the subroutine that optimizes rho given a fixed t value
@@ -91,7 +89,7 @@ FnameE <- function(fname){
   return(fname)
 }
 
-seqfile <- treefile <- taxafile <- splitfile <- model <- NULL
+seqfile <- treefile <- taxafile <- rootfile <- splitfile <- model <- NULL
 grid.size <- 4
 while(iarg>=6){
   if(substring(args[iarg],1,1)=='-'){
@@ -107,10 +105,10 @@ while(iarg>=6){
       seqfile <- FnameE(val); not.an.option <- FALSE
     }
     if(opt=="-t"){
-      treefile <- val; not.an.option <- FALSE
-      AB <- FnameE(paste0("AB.",treefile)); ABnames <- FnameE(paste0(AB,".names"))
-      A <- FnameE(paste0("A.",treefile)); Anames <- FnameE(paste0(A,".names"))
-      B <- FnameE(paste0("B.",treefile)); Bnames <- FnameE(paste0(B,".names"))
+      treefile <- FnameE(val); not.an.option <- FALSE
+    }
+    if(opt=="-r"){
+      rootfile <- FnameE(val); not.an.option <- FALSE
     }
     if(opt=="-l"){
       splitfile <- FnameE(val); not.an.option <- FALSE
@@ -129,39 +127,44 @@ if(is.null(seqfile)) stop("Need sequence file: -s seqfile")
 if(is.null(treefile)) stop("Need tree file: -t treefile")
 if(is.null(model)) stop("Need model: -m model")
 if(is.null(splitfile)) stop("Need file with integer labels of taxa on one side of split: -l splitfile")
+if(is.null(rootfile)) stop("Need file with integer labels of taxa on one side of root: -r rootfile")
 
 ##--------------------------------
 
-nA <- read.tree(text=ut2nrt(utree(A),unames(Anames)))
-nB <- read.tree(text=ut2nrt(utree(B),unames(Bnames)))
-nAB <- read.tree(text=ut2nrt(utree(AB),unames(ABnames)))
-write.tree(nA,file="tmp.A.treefile")
-write.tree(nB,file="tmp.B.treefile")
-write.tree(nAB,file="tmp.AB.treefile")
+lAB <- lA <- lB <- -1
+run_iqtree <- function(fix=TRUE,tree=treefile) {
+  # run system call to iqtree
+  if(fix)
+    system(paste(iqtree,"-s",seqfile,"-me 1 -m",model,"-nt 10 -pre tmp -te",tree,"-redo -mwopt -wspm -wslmr -quiet -blfix"))
+  else
+    system(paste(iqtree,"-s",seqfile,"-me 1 -m",model,"-nt 10 -pre tmp -te",tree,"-redo -mwopt -wspm -wslmr -quiet"))
+  
+  # get site likelihood vector from iqtree output file
+  lAB <<- site_likelihood("tmp.sitelh")
+}
+# do initial IQTREE run (don't fix edge lengths)
+run_iqtree(fix=FALSE) 
+
+# run rtsplit
+cmd <- paste("rtsplit -s",seqfile,"-t tmp.treefile -r",rootfile,"-l",splitfile)
+system(cmd)
+
+A <- "A.tmp.treefile"; B <- "B.tmp.treefile"
+Anames <- "A.tmp.treefile.names"; Bnames <- "B.tmp.treefile.names"
+
+# convert rtsplit output to newick
+nA <- read.tree(text=ut2nrt(utree(A),unames(Anames))); write.tree(nA,file=A)
+nB <- read.tree(text=ut2nrt(utree(B),unames(Bnames))); write.tree(nB,file=B)
 
 # generate sequence files for tree A and B
 tree_seq(seqfile, unames(Anames), "A"); A.seqfile <- paste0("A.",seqfile)
 tree_seq(seqfile, unames(Bnames), "B"); B.seqfile <- paste0("B.",seqfile)
 
-lAB <- lA <- lB <- -1
-run_iqtree <- function(fix=TRUE) {
-  # run system call to iqtree
-  if(fix)
-    system(paste(iqtree,"-s",seqfile,"-me 1 -m",model,"-nt 10 -pre tmp.AB -te tmp.AB.treefile -redo -mwopt -wspm -wslmr -quiet -blfix"))
-  else
-    system(paste(iqtree,"-s",seqfile,"-me 1 -m",model,"-nt 10 -pre tmp.AB -te tmp.AB.treefile -redo -mwopt -wspm -wslmr -quiet"))
-  
-  # get site likelihood vector from iqtree output file
-  lAB <<- site_likelihood("tmp.AB.sitelh")
-}
-# do initial IQTREE run (don't fix edge lengths)
-run_iqtree(fix=FALSE) 
-
-system(paste(iqtree,"-s",A.seqfile,"-me 1 -m",model,"-nt 10 -pre tmp.A -te tmp.A.treefile -redo -mwopt -wspm -wslmr -quiet"))
-system(paste(iqtree,"-s",B.seqfile,"-me 1 -m",model,"-nt 10 -pre tmp.B -te tmp.B.treefile -redo -mwopt -wspm -wslmr -quiet"))
-lA <- site_likelihood("tmp.A.sitelh")
-lB <- site_likelihood("tmp.B.sitelh")  
-rem_iqtree("A","B")
+system(paste(iqtree,"-s",A.seqfile,"-me 1 -m",model,"-nt 10 -pre A.tmp -te A.tmp.treefile -redo -mwopt -wspm -wslmr -quiet"))
+system(paste(iqtree,"-s",B.seqfile,"-me 1 -m",model,"-nt 10 -pre B.tmp -te B.tmp.treefile -redo -mwopt -wspm -wslmr -quiet"))
+lA <- site_likelihood("A.tmp.sitelh")
+lB <- site_likelihood("B.tmp.sitelh")  
+rem_iqtree()
 
 # do the first round of optimization
 rho <- optim_rho(lAB,lA,lB)
@@ -170,11 +173,11 @@ cat(paste("Initial rho =",rho[1],", lf =",rho[2],"\n"))
 taxa <- scan(splitfile,what=integer(),quiet=TRUE)
 
 # get the initial optimization for t from IQTREE output
-make.utree("tmp.AB.treefile",seqfile,"tmp.AB.utreec","tmp.AB.utreec.names")
+make.utree("tmp.treefile",seqfile,"tmp.AB.utreec","tmp.AB.utreec.names")
 uAB <- root_tree("tmp.AB.utreec",taxa); write.table(uAB, file="tmp.AB.utreec", row.names=FALSE, col.names=FALSE)
+ABnames <- "tmp.AB.utreec.names"
 tmax <- best.t <- sum(uAB[nrow(uAB),3:4]) # take the last row from the utreec matrix (split root)
 cat(paste("IQ-TREE optimized edge length t:",tmax,"\n"))
-rem_iqtree("AB") 
 
 # form grid
 tmp.grid <- seq(0,tmax,tmax/grid.size)
@@ -191,10 +194,10 @@ for(t in grid){
   # update the split edge of AB to new t value, convert to newick and overwrite the temp treefile
   uAB[nrow(uAB),3:4] <- c(t,0); #write.table(uAB, file=paste0("tmp.",i,".ut.debug"), row.names=FALSE, col.names=FALSE)
   nAB <- read.tree(text=ut2nrt(uAB,unames(ABnames)))
-  write.tree(nAB,"tmp.AB.treefile"); #write.tree(nAB,paste0("tmp.",i,".n.debug"))
+  write.tree(nAB,"tmp.AB.treefile"); 
   
   # get the iqtree output for the updated edge length
-  run_iqtree()
+  run_iqtree(tree="tmp.AB.treefile")
   
   # optimize rho and set it as the new best choice if the LF value is greater than previous rho
   new.rho <- optim_rho(lAB,lA,lB)
@@ -205,7 +208,7 @@ for(t in grid){
     cat(paste("New best found; rho updated to",rho[1],"\n"))
   }
   
-  rem_iqtree("AB")
+  rem_iqtree()
   i <- i+1
 }
 
@@ -213,6 +216,6 @@ cat(paste("FINISHED: best rho =",rho[1],", lf =",rho[2],", t =",best.t,"\n"))
 
 # remove the rest of the generated files
 to.remove <- c("tmp.AB.utreec","tmp.AB.utreec.names","tmp.AB.treefile",
-               "tmp.A.treefile","tmp.B.treefile",paste0("A.",seqfile),
-               paste0("B.",seqfile))
+               uAB, ABnames, A, B, Anames, Bnames, 
+               paste0("A.",seqfile),paste0("B.",seqfile))
 did.remove <- file.remove(to.remove)

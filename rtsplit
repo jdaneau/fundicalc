@@ -5,7 +5,7 @@ source("root_tree.R")
 ##------------------------------------------------------------------------------
 
 # RTsplit (Tree Splitter in R)
-# Takes a labeled Newick tree file and creates 3 sets of 3 files for trees AB, A and B based on a given root and split point
+# Takes a labeled Newick tree file and creates 3 sets of 2 files for trees AB, A and B based on a given root and split point
 # To be used as input in fundicalc
 
 # Dependencies: convert_tree.R, root_tree.R
@@ -65,12 +65,12 @@ AB <- paste0("AB.",treefile); AB.names <- paste0("AB.",treefile,".names")
 
 # Initialize and root the utree, then write to file
 utreec <- make.utree(treefile,seqfile,"tmp.utreec",AB.names)
-taxa <- scan(taxafile, what=integer())
+taxa <- scan(taxafile, what=integer(), quiet=TRUE)
 root_utreec <- root_tree("tmp.utreec",taxa)
 write.table(root_utreec, file="tmp.utreec", row.names=FALSE, col.names=FALSE)
 
 # Split trees into tree A and tree B using a version of AB rooted at the split point
-A.split <- scan(splitfile, what=integer())
+A.split <- scan(splitfile, what=integer(), quiet=TRUE)
 B.split <- setdiff(0:(ntaxa-1), A.split)
 split_utreec <- root_tree("tmp.utreec",A.split)
 write.table(split_utreec, file=AB, row.names=FALSE, col.names=FALSE)
@@ -79,7 +79,7 @@ split_tree(AB, AB.names, B, B.split)
 
 # Check A and B for faulty roots and fix them if needed
 check_root <- function(ut_f){
-  t <- scan(ut_f,what=numeric())
+  t <- scan(ut_f,what=numeric(),quiet=TRUE)
   if(t[length(t)] == 0 | t[length(t)-1] == 0) {
     force_root(ut_f)
   }

@@ -1,2 +1,9 @@
+Version 0.5.5 - 2022-09-22
+- Change flow of execution so that fundicalc is all that needs to be called from the command line instead of rtsplit followed by fundicalc
+- Within fundicalc, use IQ-TREE to optimize tree AB prior to splitting it with rtsplit
+- Change del.taxa.utreecc to unroot the tree before processing it so that the correct topology is used
+- Change root_tree to force rooting the output matrix if rert did not add a root at the end
+- Remove noisy output from rtsplit
+
 Version 0.5.0 - 2022-09-15
 - Initial commit

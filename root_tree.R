@@ -65,15 +65,18 @@ root_tree <- function(utreefile,taxa) {
   cmdline <- paste("./rert",LocateRoot(utc,taxa),dim(utc)[1]+1,"<",utreefile,"> tmp.root.utreec")
   system(cmdline)
   utc <- matrix(scan("tmp.root.utreec",quiet=TRUE),ncol=4,byrow=TRUE)
+  utc <- force_root(utc,file=FALSE) # if rert didn't root the tree, force the root by splitting the last line in half
   did.remove <- file.remove("tmp.root.utreec")
   return(utc)
 }
 
-# force_root(utreefile) 
-# if a utree file ends with an unrooted line (e.g. "x y z 0" or "x y 0 z"), replace "z" and "0" with z/2 to root it.
-force_root <- function(utreefile) {
-  f <- file(utreefile); l <- readLines(f)
-  last_line <- unlist(strsplit(l[length(l)], " "))
+# force_root(utreec) 
+# if a utreec matrix ends with an unrooted line (e.g. "x y z 0" or "x y 0 z"), replace "z" and "0" with z/2 to root it.
+force_root <- function(utreec,file=TRUE) {
+  if(file) {
+    f <- file(utreec); l <- readLines(f)
+    last_line <- unlist(strsplit(l[length(l)], " "))
+  } else last_line <- utreec[nrow(utreec),]
   rewrite <- FALSE
   if(as.numeric(last_line[3]) == 0) {
     n <- as.numeric(last_line[4]); rewrite <- TRUE
@@ -81,11 +84,18 @@ force_root <- function(utreefile) {
     n <- as.numeric(last_line[3]); rewrite <- TRUE
   }
   if(rewrite){
-    last_line[3] <- last_line[4] <- as.character(n/2)
-    last_line <- paste(last_line,collapse=" ")
-    l[length(l)] <- last_line
-    writeLines(l,f); close(f)
+    last_line[3] <- last_line[4] <- n/2
+    if(file){
+      last_line <- as.character(last_line)
+      last_line <- paste(last_line,collapse=" ")
+      l[length(l)] <- last_line
+      writeLines(l,f); close(f)
+    } else {
+      utreec[nrow(utreec),] <- last_line
+      return(utreec)
+    }
   }
+  if(file) return() else return(utreec)
 }
 
 # make_namesfile(namesfile,remtaxa,outfile)
