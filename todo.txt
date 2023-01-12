@@ -1,0 +1,15 @@
+Current progress:
+FundiCalc has its base functionality entirely implemented; the program will read in a sequence file, newick tree file, root file and tree file,
+and run several routines outlined in rtsplit, root_tree.R and convert_tree.R. First the program will run IQ-TREE on the input data to get an intial
+estimate for the log-likelihood. This is done without fixing branch lengths. It will then use that output from IQ-TREE to split the tree based on the 
+provided split in the splitfile, using rtsplit. Following this is the main routine where the program calculates the log-likelihood for every iteration
+of t using either gfmix or IQ-TREE (depending on which is specified in the -ll flag, default being gfmix) and finds the value of t that gives the best
+rho value. Right now the values of t are selected based on an evenly-spaced grid between 0 and t_max, which is just the initial edge length.
+The optimization algorithm can be seen in the "optim_rho" method within the script. This is repeated for every t and the best lf and t values are printed at the end.
+
+TODO:
+- Get proper test data to determine what a good answer would look like
+- Make tests for all the routines (need test data first)
+- Do more general testing of the main program
+- Add a second optimization method (optim) in lieu of the grid
+- Continue checking that the tree logic is working correctly (currently unsure where we're at with this)
