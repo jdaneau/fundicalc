@@ -1,19 +1,23 @@
 ######
 # convert_tree is a collection of functions for interfacing between newick and utreec formats
 
+library(ape)
+
 # plot_utree_file(utreefile,namesfile)
 # creates a visual plot of a utreec from a file
-plot_utree_file <- function(utreefile,namesfile,rooted=TRUE){
+plot_utree_file <- function(utreefile,namesfile=NULL,rooted=TRUE){
   func <- ut2n
   if(rooted) func <- ut2nrt
-  plot(read.tree(text=func(utree(utreefile), unames(namesfile))))
+  if(is.null(namesfile)) names <- seq(0,nrow(utree(utreefile))) else names <- unames(namesfile)
+  plot(read.tree(text=func(utree(utreefile), names)))
 }
 
 # plot_utree(utreec,names)
 # creates a visual plot of a utreec matrix
-plot_utree <- function(utreec,names,rooted=TRUE){
+plot_utree <- function(utreec,names=NULL,rooted=TRUE){
   func <- ut2n
   if(rooted) func <- ut2nrt
+  if(is.null(names)) names <- seq(0,nrow(utreec))
   plot(read.tree(text=func(utreec,names)))
 }
 
@@ -63,20 +67,31 @@ ut2nrt <- function(utreec,names,blabel){
   return(paste0(tstring[(ntaxa-1+ntaxa)],";"))
 }
 
+# TODO: figure out if this is broken for deleting several taxa at once (numeric id's change between iterations, so maybe?)
+# doesn't seem to be working properly for the locate_split_root function
+
 # del.taxa.utreecc(utreec,taxa) => utreec
 # removes a set of taxa from a utreec and returns the (unrooted) result
-del.taxa.utreecc <- function(utreec, taxa){
+del.taxa.utreecc <- function(utreec, taxa, root=FALSE){
   n <- nrow(utreec)
   utreec[n,3] <- sum(utreec[n,3:4]); utreec[n,4] <- 0 # unroot the tree if it's rooted
   write(t(utreec),ncol=4,file="tmp.del.utreec")
   taxa <- -sort(-taxa)
-  for(tc in taxa){
+  for(i in 1:length(taxa)){
+    plot_utree_file("tmp.del.utreec",rooted=FALSE)
+    tc <- taxa[i]
+    #print(paste("removing",tc))
     cmdline <- paste("./del-taxa-utreec -d",tc,"-u tmp.del.utreec > tmp.utreecn")
     system(cmdline)
-    system("mv tmp.utreecn tmp.del.utreec")
+    system("mv tmp.utreecn tmp.del.utreec") # :)
   }
+  plot_utree_file("tmp.del.utreec",rooted=FALSE)
   utreec <- matrix(scan("tmp.del.utreec",quiet=TRUE),ncol=4,byrow=TRUE)
   system("rm tmp.del.utreec")
+  if(root){
+    n <- nrow(utreec)
+    v <- utreec[n,3]/2; utreec[n,3] <- v; utreec[n,4] <- v
+  }
   return(utreec)
 }
 

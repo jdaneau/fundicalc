@@ -1,0 +1,37 @@
+On the state of Fundicalc
+
+- Testing
+Currently the program is not unit tested at all. You'll find that the test file ("fundicalc_tests") is almost completely empty.
+That's mainly due to the difficulty of writing tests that can properly check that the tree operations are working correctly.
+There are dummy methods for all the main functions I considered useful to test.
+
+- Accuracy
+The program's output has not been checked for accuracy or correctness due to a lack of sample/expected output data. 
+It's recommended for further development that the output of the program is tested against a known value to see if it is close enough.
+
+- Bugs
+At the time of writing this, there is a major bug in the program where the call to gfmix in the function "run_gfmix" is crashing.
+I'm not completely sure on the specifics of what is going wrong, because gfmix is a program I haven't studied much.
+(It's used mostly as a "black box" in fundicalc, just like the other tree-related binaries.) The main error I am getting is
+"Error in if (err < tol) break : missing value where TRUE/FALSE needed", followed by other errors that are caused by that.
+After some invesigation, I've found that the "wtc" matrix is showing up as NULL in the cFcGmu function. This originates from
+the matrix being created inside the GarpMix function, where it parses the .iqtree file and creates a weight matrix from that.
+For some reason, this is not working correctly. I think it might be because it's getting the wrong values for where the start/stop
+point is when parsing the file. Anyway, this is the biggest issue that needs addressing. Aside from that, I think it's very likely
+that some of the tree functions found in root_tree.R and convert_tree.R are not behaving as they should, due to how volatile they
+are in nature. These will almost certainly need more testing and refinement. 
+
+- garp-est
+Fundicalc is developed around a version of gfmix that outputs the site log likelihoods with a special "-l" flag, called garp-est.
+This version isn't publicly available, but it can be found on the mathstat cluster at /home/shared/justin. There is also a special
+-e flag that will estimate the data, and produces a better result if added.
+
+- Optim
+There is a flag for Fundicalc called -om which lets the user decide which optimization method to use. Currently, only the 'G' option
+is supported (grid optimization.) However, it's intended for another method to be available which uses the 'optim' function from R to
+optimize instead of a grid. I never got around to implementing this, so good luck to whoever decides to do it! 
+
+- root_tree.R and convert_tree.R
+Truthfully these should probably be combined into a single functions file, because from a software engineering point of view there's
+a lot of coupling/dependance going on between the two files. It may take a bit of reorganization to make sure it's not a mess, though.
+I added a header above each function that explains what it does, so hopefully that helps!

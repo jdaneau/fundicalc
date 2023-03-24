@@ -1,0 +1,63 @@
+#!/usr/bin/env Rscript
+##------------------------------------------------------------------------------
+
+library(testthat)
+source("convert_tree.R")
+source("root_tree.R")
+options(warn=1)
+
+test_utree <- t(matrix(c(   #            [8]
+  0, 1, 0.1, 0.1,           #        ____/ \____[7]
+  2, 3, 0.2, 0.2,           #       /          /   \
+  4, 6, 0.3, 0.3,           #     [5]        [6]   [4]
+  5, 7, 0.4, 0.4            #    /   \      /   \
+),nrow=4,ncol=4))           #  [0]   [1]  [2]   [3]
+
+test_names <- c("A","B","C","D","E")
+
+#################
+## convert_tree.R
+
+test_that("del.taxa.utreecc",{
+  test1 <- del.taxa.utreecc(test_utree, 0)
+  expect_equal(dim(test1),c(3,4))
+})
+
+test_that("make.utree",{
+  
+})
+
+test_that("utree",{
+  
+})
+
+test_that("unames",{
+  
+})
+
+##############
+## root_tree.R
+
+test_that("root_tree",{
+  
+})
+
+test_that("force_root",{
+  
+})
+
+test_that("make_namesfile",{
+  
+})
+
+test_that("split_tree",{
+  
+})
+
+test_that("root_subtree",{
+  
+})
+
+test_that("dlistf",{
+  
+})

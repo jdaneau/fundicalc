@@ -1,5 +1,12 @@
 source("convert_tree.R")
 
+p_debug <- function(...) {
+  for(p in list(...)) {
+    cat(toString(p))
+  }
+  cat("\n")
+}
+
 #####
 # Functions from gfmix
 
@@ -98,6 +105,22 @@ force_root <- function(utreec,file=TRUE) {
   if(file) return() else return(utreec)
 }
 
+# removes names for intermediate nodes (numbers, typically) from utreec name files
+clean_namesfile <- function(namesfile,out) {
+  f <- file(namesfile,"r")
+  l <- vector()
+  for(line in readLines(f)){
+    if(substr(line,2,2) %in% c("0","1","2","3","4","5","6","7","8","9")){
+      break
+    } else {
+      l <- append(l, line)
+    }
+  }
+  close(f)
+  f <- file(out,"w+")
+  writeLines(l,f); close(f)
+}
+
 # make_namesfile(namesfile,remtaxa,outfile)
 # generates a new names file for a subtree given the names file of a larger tree and the taxa not present in the subtree
 make_namesfile <- function(namesfile,remtaxa,outfile) {
@@ -121,7 +144,8 @@ make_namesfile <- function(namesfile,remtaxa,outfile) {
 # routine that splits and roots a subtree from a bigger tree (main function of rtsplit)
 split_tree <- function(utreefile, namesfile, outfile, remtaxa){
   ut <- utree(utreefile)
-  make_namesfile(namesfile, remtaxa, outfile) # make a new names file for the subtree
+  new.names <- paste0("new_",namesfile); clean_namesfile(namesfile,new.names)
+  make_namesfile(new.names, remtaxa, outfile) # make a new names file for the subtree
   
   rem <- del.taxa.utreecc(ut,remtaxa) # remove the taxa
   
@@ -131,7 +155,7 @@ split_tree <- function(utreefile, namesfile, outfile, remtaxa){
   close(f)
   
   # reroot subtree at the split point
-  rem <- root_subtree(utreefile, outfile, namesfile, paste0(outfile,".names"), remtaxa) 
+  rem <- root_subtree(utreefile, outfile, new.names, paste0(outfile,".names"), remtaxa) 
   
   file.create(outfile)
   f <- file(outfile)
@@ -142,7 +166,7 @@ split_tree <- function(utreefile, namesfile, outfile, remtaxa){
 # root_subtree(u_ab_file,u_sub_file,ab_names_file,sub_names_file,remtaxa) => u_sub
 # subroutine called by split_tree that properly roots a subtree at the split point
 root_subtree <- function(u_ab_file, u_sub_file, ab_names_file, sub_names_file, remtaxa) {
-  u_ab <- utree(u_ab_file); u_sub <- utree(u_sub_file)
+  u_ab <- utree(u_ab_file)
   ab_names <- unames(ab_names_file); sub_names <- unames(sub_names_file)
   ntaxa <- length(ab_names)
   keeptaxa <- setdiff(seq(0,ntaxa-1), remtaxa)
@@ -154,6 +178,55 @@ root_subtree <- function(u_ab_file, u_sub_file, ab_names_file, sub_names_file, r
   
   u_sub <- root_tree(u_sub_file, split.root)
   return(u_sub)
+}
+
+# assumes the input tree is rooted, and outputs a file containing taxa that represent the split of that tree's root
+make_root_split <- function(tree,outfile,newick=FALSE,seqfile=NULL) {
+  if(newick){
+    if(is.null(seqfile)) stop("make_root_split: seqfile not provided for newick")
+    tmp.tree.name <- paste0("tmp.tmp.",outfile)
+    write(tree,tmp.tree.name)
+    make.utree(tmp.tree.name,seqfile,"tmp.tmp.tree","tmp.tmp.names")
+    tree <- force_root(utree("tmp.tmp.tree"),file=FALSE)
+    did.remove <- file.remove(c(tmp.tree.name,"tmp.tmp.tree","tmp.tmp.names"))
+  }
+  dlist <- dlistf(tree)
+  roothalf <- tree[nrow(tree),1] + 1
+  split <- dlist[[roothalf]]
+  write(split,file=outfile,ncolumns=length(split))
+}
+
+# function used by rtsplit to determine whether the root of tree AB is located in subtree A or B 
+locate_split_root <- function(utreec,root,split) {
+  ntaxa <- nrow(utreec)+1
+  all <- seq(0,ntaxa-1)
+  root_c <- setdiff(all,root); split_c <- setdiff(all,split)
+  split <- sort(split); split_c <- sort(split_c) # ensure the splits are from least -> greatest
+  A.contained <- (length(setdiff(split,root)) == 0 | length(setdiff(split,root_c)) == 0)
+  B.contained <- (length(setdiff(split_c,root)) == 0 | length(setdiff(split_c,root_c)) == 0)
+  
+  # determine where the tree's root is located : either inside tree A, tree B, or at the same location as the split
+  if(A.contained & !B.contained)
+    rootloc <- "B"
+  else if(!A.contained & B.contained)
+    rootloc <- "A"
+  else
+    return(list("0",NULL)) # root same as split, no changes needed
+  
+  # remove all target taxa except for one "ghost" taxon which has no edge length but maintains the structure
+  if(rootloc == "A") {
+    ghost <- split_c[1]
+    subtree <- del.taxa.utreecc(utreec,split_c[-1],root=TRUE)
+  }
+  else {
+    ghost <- split[1]
+    subtree <- del.taxa.utreecc(utreec,split[-1],root=TRUE)
+  }
+  
+  # alter edge length for ghost taxon
+  subtree[which(subtree == ghost,arr.ind=TRUE)[1],] <- c()
+  
+  return(list(rootloc,subtree))
 }
 
 # dlistf(ut) => dl
